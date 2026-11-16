@@ -98,6 +98,7 @@ class ExecutionOrchestrator:
             notional_cny=mapped["notional_cny"],
             idempotency_key=mapped["idempotency_key"],
             require_live_session=live_enabled and confirm_mode == "auto",
+            avg_cost=mapped.get("avg_cost"),
         )
         if not gate.allowed:
             return self._persist_rejected_from_mapped(
@@ -209,14 +210,15 @@ class ExecutionOrchestrator:
 
         live_enabled = bool(row.live_enabled)
         # Re-check live session on actual submit
+        meta = _meta(row)
         gate = self.risk_gate.evaluate(
             signal={
                 "id": row.signal_id,
                 "stock_code": row.stock_code,
                 "market": row.market,
                 "action": row.action,
-                "entry_low": _meta(row).get("entry_low"),
-                "entry_high": _meta(row).get("entry_high"),
+                "entry_low": meta.get("entry_low"),
+                "entry_high": meta.get("entry_high"),
             },
             side=row.side,
             quantity=int(row.quantity),
@@ -224,6 +226,7 @@ class ExecutionOrchestrator:
             notional_cny=float(row.notional_cny or (row.quantity * row.limit_price)),
             idempotency_key=f"{row.idempotency_key}#submit",
             require_live_session=live_enabled,
+            avg_cost=meta.get("avg_cost"),
         )
         # Duplicate submit key is expected unique per submit marker; ignore duplicate reason for submit marker.
         if not gate.allowed and gate.reason != "duplicate_idempotency_key":

@@ -51,6 +51,7 @@ class ExecutionRiskGate:
         notional_cny: float,
         idempotency_key: str,
         require_live_session: bool,
+        avg_cost: Optional[float] = None,
     ) -> RiskGateResult:
         market = str(signal.get("market") or "").strip().lower()
         action = str(signal.get("action") or "").strip().lower()
@@ -100,6 +101,15 @@ class ExecutionRiskGate:
             except (TypeError, ValueError):
                 return RiskGateResult(False, "entry_band_invalid")
 
+        exit_profit = self._check_exit_profit_floors(
+            action=action,
+            quantity=quantity,
+            limit_price=limit_price,
+            avg_cost=avg_cost,
+        )
+        if not exit_profit.allowed:
+            return exit_profit
+
         board_reason = _special_board_reason(stock_code)
         if board_reason:
             return RiskGateResult(False, board_reason, {"stock_code": stock_code})
@@ -118,6 +128,59 @@ class ExecutionRiskGate:
                 return session_result
 
         return RiskGateResult(True, "ok")
+
+    def _check_exit_profit_floors(
+        self,
+        *,
+        action: str,
+        quantity: int,
+        limit_price: float,
+        avg_cost: Optional[float],
+    ) -> RiskGateResult:
+        """Enforce per-action profit floors for sell and reduce."""
+
+        if action == "sell":
+            min_pct = getattr(self.config, "execution_min_profit_pct_to_sell", None)
+            min_cny = getattr(self.config, "execution_min_profit_cny_to_sell", None)
+        elif action == "reduce":
+            min_pct = getattr(self.config, "execution_min_profit_pct_to_reduce", None)
+            min_cny = getattr(self.config, "execution_min_profit_cny_to_reduce", None)
+        else:
+            return RiskGateResult(True, "ok")
+
+        if min_pct is None and min_cny is None:
+            return RiskGateResult(True, "ok")
+
+        try:
+            cost = float(avg_cost) if avg_cost is not None else None
+        except (TypeError, ValueError):
+            cost = None
+        if cost is None or cost <= 0:
+            return RiskGateResult(
+                False,
+                "exit_profit_basis_unavailable",
+                {"action": action, "avg_cost": avg_cost},
+            )
+
+        profit_per_share = float(limit_price) - cost
+        profit_cny = profit_per_share * float(quantity)
+        profit_pct = (float(limit_price) / cost - 1.0) * 100.0
+        details = {
+            "action": action,
+            "avg_cost": cost,
+            "limit_price": float(limit_price),
+            "quantity": int(quantity),
+            "profit_pct": round(profit_pct, 6),
+            "profit_cny": round(profit_cny, 6),
+            "min_profit_pct": min_pct,
+            "min_profit_cny": min_cny,
+        }
+
+        if min_pct is not None and profit_pct + 1e-9 < float(min_pct):
+            return RiskGateResult(False, "min_profit_pct_not_met", details)
+        if min_cny is not None and profit_cny + 1e-9 < float(min_cny):
+            return RiskGateResult(False, "min_profit_cny_not_met", details)
+        return RiskGateResult(True, "ok", details)
 
     def _market_allowlist(self) -> Set[str]:
         raw = getattr(self.config, "execution_market_allowlist", "cn") or "cn"

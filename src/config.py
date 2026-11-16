@@ -362,6 +362,21 @@ def _parse_optional_positive_int(value: Optional[str], *, field_name: str) -> Op
     return parsed
 
 
+def _parse_optional_non_negative_float(value: Optional[str], *, field_name: str) -> Optional[float]:
+    """Parse optional float >= 0; empty means unset."""
+    if value is None or not str(value).strip():
+        return None
+    try:
+        parsed = float(str(value).strip())
+    except (TypeError, ValueError):
+        logger.warning("%s=%r is not a valid number; treating as unset", field_name, value)
+        return None
+    if parsed < 0:
+        logger.warning("%s=%r must be >= 0; treating as unset", field_name, value)
+        return None
+    return parsed
+
+
 def normalize_news_strategy_profile(value: Optional[str]) -> str:
     """Normalize news strategy profile to known values."""
     candidate = (value or "short").strip().lower()
@@ -1420,6 +1435,11 @@ class Config:
     execution_max_order_notional_cny: Optional[float] = None
     execution_max_position_pct: Optional[float] = None
     execution_require_entry_band: bool = True
+    # sell / reduce exit profit floors (unset = not enforced; pct+cny both set => AND)
+    execution_min_profit_pct_to_sell: Optional[float] = None
+    execution_min_profit_cny_to_sell: Optional[float] = None
+    execution_min_profit_pct_to_reduce: Optional[float] = None
+    execution_min_profit_cny_to_reduce: Optional[float] = None
     execution_portfolio_account_id: Optional[int] = None
     execution_sync_portfolio_ledger: bool = False
     execution_allow_duplicate_signal_intents: bool = False
@@ -2517,6 +2537,22 @@ class Config:
             execution_require_entry_band=parse_env_bool(
                 os.getenv('EXECUTION_REQUIRE_ENTRY_BAND'),
                 default=True,
+            ),
+            execution_min_profit_pct_to_sell=_parse_optional_non_negative_float(
+                os.getenv('EXECUTION_MIN_PROFIT_PCT_TO_SELL'),
+                field_name='EXECUTION_MIN_PROFIT_PCT_TO_SELL',
+            ),
+            execution_min_profit_cny_to_sell=_parse_optional_non_negative_float(
+                os.getenv('EXECUTION_MIN_PROFIT_CNY_TO_SELL'),
+                field_name='EXECUTION_MIN_PROFIT_CNY_TO_SELL',
+            ),
+            execution_min_profit_pct_to_reduce=_parse_optional_non_negative_float(
+                os.getenv('EXECUTION_MIN_PROFIT_PCT_TO_REDUCE'),
+                field_name='EXECUTION_MIN_PROFIT_PCT_TO_REDUCE',
+            ),
+            execution_min_profit_cny_to_reduce=_parse_optional_non_negative_float(
+                os.getenv('EXECUTION_MIN_PROFIT_CNY_TO_REDUCE'),
+                field_name='EXECUTION_MIN_PROFIT_CNY_TO_REDUCE',
             ),
             execution_portfolio_account_id=_parse_optional_positive_int(
                 os.getenv('EXECUTION_PORTFOLIO_ACCOUNT_ID'),

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [新功能] 执行层支持分别为 sell / reduce 配置最低浮盈门槛（百分比与金额可独立设置；同动作内两项都配则 AND），按持仓均价与限价估算。
 - [新功能] 新增独立 A 股执行层：DecisionSignal 落库后可生成订单意图，支持 `manual`/`auto` 确认模式、纸面提交与通达信本机客户端实盘适配（默认关闭实盘），并提供执行队列 Web/API。
 - [修复] Tushare 日线接口权限拒绝不再累计整源故障，避免 ETF 与 A 股接口互相误伤；保留网络故障计数和半开探测恢复行为。
 

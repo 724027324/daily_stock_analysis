@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 from datetime import date
 from pathlib import Path
 
@@ -180,6 +179,105 @@ def test_missing_entry_band_rejects_buy(isolated_execution_env, monkeypatch):
     result = orch.create_intent_from_signal(_signal(id=506, entry_low=None, entry_high=None))
     assert result["status"] == "rejected"
     assert "entry_band" in (result.get("reject_reason") or "")
+
+
+def test_exit_profit_rules_are_separate_for_sell_and_reduce(isolated_execution_env):
+    gate = ExecutionRiskGate(config=Config.get_instance())
+    cfg = Config.get_instance()
+    cfg.execution_min_profit_pct_to_sell = 5.0
+    cfg.execution_min_profit_cny_to_sell = None
+    cfg.execution_min_profit_pct_to_reduce = None
+    cfg.execution_min_profit_cny_to_reduce = None
+
+    sell_blocked = gate.evaluate(
+        signal=_signal(action="sell"),
+        side="sell",
+        quantity=100,
+        limit_price=10.2,
+        notional_cny=1020.0,
+        idempotency_key="profit-sell-pct",
+        require_live_session=False,
+        avg_cost=10.0,
+    )
+    assert sell_blocked.allowed is False
+    assert sell_blocked.reason == "min_profit_pct_not_met"
+
+    reduce_ok = gate.evaluate(
+        signal=_signal(action="reduce"),
+        side="sell",
+        quantity=100,
+        limit_price=10.2,
+        notional_cny=1020.0,
+        idempotency_key="profit-reduce-free",
+        require_live_session=False,
+        avg_cost=10.0,
+    )
+    assert reduce_ok.allowed is True
+
+    cfg.execution_min_profit_cny_to_reduce = 1000.0
+    reduce_blocked = gate.evaluate(
+        signal=_signal(action="reduce"),
+        side="sell",
+        quantity=100,
+        limit_price=11.0,
+        notional_cny=1100.0,
+        idempotency_key="profit-reduce-cny",
+        require_live_session=False,
+        avg_cost=10.0,
+    )
+    assert reduce_blocked.allowed is False
+    assert reduce_blocked.reason == "min_profit_cny_not_met"
+
+
+def test_exit_profit_sell_and_rules(isolated_execution_env):
+    gate = ExecutionRiskGate(config=Config.get_instance())
+    cfg = Config.get_instance()
+    cfg.execution_min_profit_pct_to_sell = 5.0
+    cfg.execution_min_profit_cny_to_sell = 1000.0
+    cfg.execution_min_profit_pct_to_reduce = None
+    cfg.execution_min_profit_cny_to_reduce = None
+
+    both = gate.evaluate(
+        signal=_signal(action="sell"),
+        side="sell",
+        quantity=100,
+        limit_price=12.0,
+        notional_cny=1200.0,
+        idempotency_key="profit-sell-both-1",
+        require_live_session=False,
+        avg_cost=10.0,
+    )
+    assert both.allowed is False
+    assert both.reason == "min_profit_cny_not_met"
+
+    ok = gate.evaluate(
+        signal=_signal(action="sell"),
+        side="sell",
+        quantity=1000,
+        limit_price=12.0,
+        notional_cny=12000.0,
+        idempotency_key="profit-sell-both-2",
+        require_live_session=False,
+        avg_cost=10.0,
+    )
+    assert ok.allowed is True
+
+
+def test_exit_profit_requires_avg_cost_when_configured(isolated_execution_env):
+    gate = ExecutionRiskGate(config=Config.get_instance())
+    Config.get_instance().execution_min_profit_pct_to_sell = 1.0
+    result = gate.evaluate(
+        signal=_signal(action="sell"),
+        side="sell",
+        quantity=100,
+        limit_price=12.0,
+        notional_cny=1200.0,
+        idempotency_key="profit-no-cost",
+        require_live_session=False,
+        avg_cost=None,
+    )
+    assert result.allowed is False
+    assert result.reason == "exit_profit_basis_unavailable"
 
 
 def test_api_list_and_confirm(isolated_execution_env, tmp_path, monkeypatch):

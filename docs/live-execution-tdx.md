@@ -29,6 +29,10 @@
 | `EXECUTION_MAX_ORDER_NOTIONAL_CNY` | 空 | **必须显式配置**，否则拒单 |
 | `EXECUTION_MAX_POSITION_PCT` | 空 | **必须显式配置**，否则拒单 |
 | `EXECUTION_REQUIRE_ENTRY_BAND` | `true` | buy/add 需要 entry 区间 |
+| `EXECUTION_MIN_PROFIT_PCT_TO_SELL` | 空 | sell 最低浮盈百分比；空=不启用 |
+| `EXECUTION_MIN_PROFIT_CNY_TO_SELL` | 空 | sell 最低浮盈金额（CNY）；空=不启用 |
+| `EXECUTION_MIN_PROFIT_PCT_TO_REDUCE` | 空 | reduce 最低浮盈百分比；空=不启用 |
+| `EXECUTION_MIN_PROFIT_CNY_TO_REDUCE` | 空 | reduce 最低浮盈金额（CNY）；空=不启用 |
 | `EXECUTION_PORTFOLIO_ACCOUNT_ID` | 空 | 可选组合账户，用于资金/持仓测算 |
 | `EXECUTION_SYNC_PORTFOLIO_LEDGER` | `false` | 提交成功后是否回写组合成交 |
 | `TDX_CLIENT_PATH` | 空 | 通达信客户端路径 |
@@ -63,6 +67,7 @@ TDX_CLIENT_PATH=C:\tdx\TdxW.exe
 - 仅 `market=cn`。
 - buy/add：限价取 `entry_low~entry_high` 中值；数量按 `min(可用资金*占比, 名义上限)/限价` 向下取整到手数（主板 100；688/689 为 200）。
 - sell：清仓可卖手数；reduce：约减半。
+- sell 与 reduce 盈利门槛分开配置：各自可配百分比和/或金额；同一动作内两项都配则需同时满足（AND）。按「限价相对持仓均价」估算；缺成本价则 fail-closed。
 - 北交所等未可靠识别板拒绝下单。
 
 ## 故障排查

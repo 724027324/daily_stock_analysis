@@ -56,7 +56,7 @@ class ExecutionIntentService:
         limit_price = self._limit_price(signal, action=action)
         lot_size = _lot_size_for_code(stock_code)
 
-        snapshot_account_id, available_cash, held_qty = self._resolve_account_context(
+        snapshot_account_id, available_cash, held_qty, avg_cost = self._resolve_account_context(
             stock_code=stock_code,
             account_id=account_id,
         )
@@ -94,10 +94,12 @@ class ExecutionIntentService:
             "notional_cny": round(notional, 4),
             "idempotency_key": idempotency_key,
             "portfolio_account_id": snapshot_account_id,
+            "avg_cost": avg_cost,
             "metadata": {
                 "lot_size": lot_size,
                 "available_cash": available_cash,
                 "held_qty": held_qty,
+                "avg_cost": avg_cost,
                 "entry_low": signal.get("entry_low"),
                 "entry_high": signal.get("entry_high"),
             },
@@ -165,7 +167,7 @@ class ExecutionIntentService:
         *,
         stock_code: str,
         account_id: Optional[int],
-    ) -> Tuple[Optional[int], float, float]:
+    ) -> Tuple[Optional[int], float, float, Optional[float]]:
         configured = getattr(self.config, "execution_portfolio_account_id", None)
         target_id = account_id if account_id is not None else configured
         try:
@@ -191,16 +193,21 @@ class ExecutionIntentService:
             )
             if account is None and accounts:
                 available_cash = float(snapshot.get("total_cash") or 0.0)
-                held_qty = _held_qty_from_snapshot(snapshot, stock_code)
-                return int(target_id), available_cash, held_qty
+                held_qty, avg_cost = _position_from_snapshot(snapshot, stock_code)
+                return int(target_id), available_cash, held_qty, avg_cost
             if account is None:
                 raise ExecutionIntentMappingError("portfolio_account_not_found")
             available_cash = float(account.get("total_cash") or account.get("cash") or 0.0)
-            held_qty = _held_qty_from_account(account, stock_code)
-            return int(account.get("account_id") or account.get("id") or target_id), available_cash, held_qty
+            held_qty, avg_cost = _position_from_account(account, stock_code)
+            return (
+                int(account.get("account_id") or account.get("id") or target_id),
+                available_cash,
+                held_qty,
+                avg_cost,
+            )
 
         if not accounts:
-            return None, 0.0, 0.0
+            return None, 0.0, 0.0, None
 
         account = next(
             (
@@ -212,12 +219,13 @@ class ExecutionIntentService:
             accounts[0],
         )
         available_cash = float(account.get("total_cash") or account.get("cash") or 0.0)
-        held_qty = _held_qty_from_account(account, stock_code)
+        held_qty, avg_cost = _position_from_account(account, stock_code)
         account_key = account.get("account_id") if account.get("account_id") is not None else account.get("id")
         return (
             int(account_key) if account_key is not None else None,
             available_cash,
             held_qty,
+            avg_cost,
         )
 
 
@@ -242,24 +250,38 @@ def _lot_size_for_code(stock_code: str) -> int:
     return 100
 
 
-def _held_qty_from_snapshot(snapshot: Dict[str, Any], stock_code: str) -> float:
+def _position_from_snapshot(
+    snapshot: Dict[str, Any], stock_code: str
+) -> Tuple[float, Optional[float]]:
     for account in snapshot.get("accounts") or []:
-        qty = _held_qty_from_account(account, stock_code)
+        qty, avg_cost = _position_from_account(account, stock_code)
         if qty > 0:
-            return qty
-    return 0.0
+            return qty, avg_cost
+    return 0.0, None
 
 
-def _held_qty_from_account(account: Dict[str, Any], stock_code: str) -> float:
+def _position_from_account(
+    account: Dict[str, Any], stock_code: str
+) -> Tuple[float, Optional[float]]:
     target = _normalize_code(stock_code)
     for position in account.get("positions") or account.get("holdings") or []:
         code = _normalize_code(str(position.get("symbol") or position.get("stock_code") or ""))
-        if code == target:
-            try:
-                return float(position.get("quantity") or position.get("qty") or 0.0)
-            except (TypeError, ValueError):
-                return 0.0
-    return 0.0
+        if code != target:
+            continue
+        try:
+            qty = float(position.get("quantity") or position.get("qty") or 0.0)
+        except (TypeError, ValueError):
+            qty = 0.0
+        avg_cost: Optional[float]
+        try:
+            raw_cost = position.get("avg_cost")
+            avg_cost = float(raw_cost) if raw_cost is not None else None
+            if avg_cost is not None and avg_cost <= 0:
+                avg_cost = None
+        except (TypeError, ValueError):
+            avg_cost = None
+        return qty, avg_cost
+    return 0.0, None
 
 
 def _normalize_code(code: str) -> str:
