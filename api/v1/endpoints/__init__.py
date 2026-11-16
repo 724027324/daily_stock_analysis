@@ -22,6 +22,7 @@ from api.v1.endpoints import (
     portfolio,
     alerts,
     decision_signals,
+    execution,
     screening,
 )
 __all__ = [
@@ -38,5 +39,6 @@ __all__ = [
     "portfolio",
     "alerts",
     "decision_signals",
+    "execution",
     "screening",
 ]

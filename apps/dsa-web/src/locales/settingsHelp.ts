@@ -726,6 +726,21 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响登录限流、审计和真实 IP 识别。'],
     notes: ['不可信代理链上开启会允许客户端伪造来源 IP。'],
   },
+  'settings.system.LIVE_TRADING_ENABLED': {
+    title: '启用实盘交易',
+    summary: '总开关。关闭时确认/自动提交只走纸面 broker，不会连接通达信。',
+    usage: '保持关闭做联调；仅在本机 Windows 已登录通达信且已配置金额/仓位上限后打开。',
+    notes: [
+      '交易密码只能放在本机环境变量 TDX_TRADE_PASSWORD，不要写入仓库。',
+      '详见 docs/live-execution-tdx.md。',
+    ],
+  },
+  'settings.system.EXECUTION_CONFIRM_MODE': {
+    title: '执行确认模式',
+    summary: 'manual 为半自动待确认；auto 为风控通过后直接提交。',
+    usage: '建议先用 manual 在「执行队列」确认；熟悉后再切 auto。',
+    valueNotes: ['manual', 'auto'],
+  },
   'settings.system.schedule': {
     title: '定时任务',
     summary: '控制是否启用每日定时分析以及启动时是否立即执行一次。',
@@ -1958,6 +1973,21 @@ const settingsHelpEnUS: SettingsHelpMap = {
     valueNotes: ['With multiple proxies or CDNs, rate-limit keys may collapse to edge proxy IPs.'],
     impact: ['Affects login rate limiting, auditing, and client IP detection.'],
     notes: ['Do not enable it on an untrusted proxy chain.'],
+  },
+  'settings.system.LIVE_TRADING_ENABLED': {
+    title: 'Live Trading Enabled',
+    summary: 'Master switch. When false, confirm/auto submit uses the paper broker only.',
+    usage: 'Keep off while integrating. Enable only on Windows with Tongdaxin logged in and notional/position caps configured.',
+    notes: [
+      'Keep trade passwords in local env TDX_TRADE_PASSWORD only; never commit them.',
+      'See docs/live-execution-tdx.md.',
+    ],
+  },
+  'settings.system.EXECUTION_CONFIRM_MODE': {
+    title: 'Execution Confirm Mode',
+    summary: 'manual waits for Web/API confirmation; auto submits after the risk gate.',
+    usage: 'Start with manual in the Execution queue, then switch to auto when ready.',
+    valueNotes: ['manual', 'auto'],
   },
   'settings.system.schedule': {
     title: 'Schedule',

@@ -2996,6 +2996,22 @@ class StockAnalysisPipeline:
                 summary = summarize_decision_signal(signal_result.get("item"))
                 if summary:
                     setattr(result, "decision_signal_summary", summary)
+                try:
+                    from src.services.execution_orchestrator import ExecutionOrchestrator
+
+                    ExecutionOrchestrator().handle_signal_created(
+                        signal_result.get("item") or {},
+                        created=bool(signal_result.get("created")),
+                    )
+                except Exception as exec_exc:
+                    logger.warning(
+                        "Execution orchestrator skipped after decision signal: "
+                        "query_id=%s stock_code=%s error=%s",
+                        query_id,
+                        getattr(result, "code", None),
+                        exec_exc,
+                        exc_info=True,
+                    )
         except Exception as exc:
             logger.warning(
                 "Decision signal extraction skipped after history save: query_id=%s stock_code=%s error=%s",

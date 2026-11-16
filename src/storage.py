@@ -1144,6 +1144,41 @@ class DecisionSignalRecord(Base):
     )
 
 
+class ExecutionOrderIntentRecord(Base):
+    """Order intent for the live/paper execution layer (separate from DecisionSignal)."""
+
+    __tablename__ = 'execution_order_intents'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    signal_id = Column(Integer, nullable=False, index=True)
+    stock_code = Column(String(16), nullable=False, index=True)
+    stock_name = Column(String(64))
+    market = Column(String(8), nullable=False, index=True)
+    action = Column(String(16), nullable=False, index=True)
+    side = Column(String(8), nullable=False, index=True)
+    quantity = Column(Integer, nullable=False)
+    limit_price = Column(Float, nullable=False)
+    notional_cny = Column(Float)
+    status = Column(String(24), nullable=False, default='draft', index=True)
+    confirm_mode = Column(String(16), nullable=False, index=True)
+    broker = Column(String(16), nullable=False, index=True)
+    idempotency_key = Column(String(128), nullable=False, unique=True, index=True)
+    reject_reason = Column(String(256))
+    broker_order_id = Column(String(128), index=True)
+    portfolio_account_id = Column(Integer, index=True)
+    live_enabled = Column(Boolean, nullable=False, default=False)
+    metadata_json = Column(Text)
+    created_at = Column(DateTime, default=utc_naive_now, index=True)
+    updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now, index=True)
+    submitted_at = Column(DateTime, index=True)
+
+    __table_args__ = (
+        Index('ix_execution_intent_status_created', 'status', 'created_at'),
+        Index('ix_execution_intent_signal_status', 'signal_id', 'status'),
+        Index('ix_execution_intent_stock_status', 'stock_code', 'status'),
+    )
+
+
 class DecisionSignalOutcomeRecord(Base):
     """Signal-level forward outcome for Issue #1390 P5."""
 

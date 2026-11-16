@@ -332,6 +332,36 @@ def parse_env_float(
     return parsed
 
 
+def _parse_optional_positive_float(value: Optional[str], *, field_name: str) -> Optional[float]:
+    """Parse optional positive float; empty means unset (fail-closed at risk gate)."""
+    if value is None or not str(value).strip():
+        return None
+    try:
+        parsed = float(str(value).strip())
+    except (TypeError, ValueError):
+        logger.warning("%s=%r is not a valid number; treating as unset", field_name, value)
+        return None
+    if parsed <= 0:
+        logger.warning("%s=%r must be > 0; treating as unset", field_name, value)
+        return None
+    return parsed
+
+
+def _parse_optional_positive_int(value: Optional[str], *, field_name: str) -> Optional[int]:
+    """Parse optional positive int; empty means unset."""
+    if value is None or not str(value).strip():
+        return None
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError):
+        logger.warning("%s=%r is not a valid integer; treating as unset", field_name, value)
+        return None
+    if parsed <= 0:
+        logger.warning("%s=%r must be > 0; treating as unset", field_name, value)
+        return None
+    return parsed
+
+
 def normalize_news_strategy_profile(value: Optional[str]) -> str:
     """Normalize news strategy profile to known values."""
     candidate = (value or "short").strip().lower()
@@ -1380,6 +1410,21 @@ class Config:
     portfolio_risk_stop_loss_near_ratio: float = 0.8
     portfolio_risk_lookback_days: int = 180
     portfolio_fx_update_enabled: bool = True
+
+    # === Live / paper execution (A-share Tongdaxin) ===
+    live_trading_enabled: bool = False
+    execution_confirm_mode: str = "manual"
+    execution_broker: str = "tdx"
+    execution_market_allowlist: str = "cn"
+    execution_allowed_actions: str = "buy,add,sell,reduce"
+    execution_max_order_notional_cny: Optional[float] = None
+    execution_max_position_pct: Optional[float] = None
+    execution_require_entry_band: bool = True
+    execution_portfolio_account_id: Optional[int] = None
+    execution_sync_portfolio_ledger: bool = False
+    execution_allow_duplicate_signal_intents: bool = False
+    tdx_client_path: Optional[str] = None
+    tdx_account_id: Optional[str] = None
 
     # Discord 机器人状态
     discord_bot_status: str = "A股智能分析 | /help"
@@ -2452,6 +2497,41 @@ class Config:
                 minimum=1,
             ),
             portfolio_fx_update_enabled=os.getenv('PORTFOLIO_FX_UPDATE_ENABLED', 'true').lower() == 'true',
+            live_trading_enabled=parse_env_bool(os.getenv('LIVE_TRADING_ENABLED'), default=False),
+            execution_confirm_mode=(
+                (os.getenv('EXECUTION_CONFIRM_MODE') or 'manual').strip().lower() or 'manual'
+            ),
+            execution_broker=(os.getenv('EXECUTION_BROKER') or 'tdx').strip().lower() or 'tdx',
+            execution_market_allowlist=(os.getenv('EXECUTION_MARKET_ALLOWLIST') or 'cn').strip() or 'cn',
+            execution_allowed_actions=(
+                os.getenv('EXECUTION_ALLOWED_ACTIONS') or 'buy,add,sell,reduce'
+            ).strip(),
+            execution_max_order_notional_cny=_parse_optional_positive_float(
+                os.getenv('EXECUTION_MAX_ORDER_NOTIONAL_CNY'),
+                field_name='EXECUTION_MAX_ORDER_NOTIONAL_CNY',
+            ),
+            execution_max_position_pct=_parse_optional_positive_float(
+                os.getenv('EXECUTION_MAX_POSITION_PCT'),
+                field_name='EXECUTION_MAX_POSITION_PCT',
+            ),
+            execution_require_entry_band=parse_env_bool(
+                os.getenv('EXECUTION_REQUIRE_ENTRY_BAND'),
+                default=True,
+            ),
+            execution_portfolio_account_id=_parse_optional_positive_int(
+                os.getenv('EXECUTION_PORTFOLIO_ACCOUNT_ID'),
+                field_name='EXECUTION_PORTFOLIO_ACCOUNT_ID',
+            ),
+            execution_sync_portfolio_ledger=parse_env_bool(
+                os.getenv('EXECUTION_SYNC_PORTFOLIO_LEDGER'),
+                default=False,
+            ),
+            execution_allow_duplicate_signal_intents=parse_env_bool(
+                os.getenv('EXECUTION_ALLOW_DUPLICATE_SIGNAL_INTENTS'),
+                default=False,
+            ),
+            tdx_client_path=(os.getenv('TDX_CLIENT_PATH') or '').strip() or None,
+            tdx_account_id=(os.getenv('TDX_ACCOUNT_ID') or '').strip() or None,
             screening_enabled=parse_env_bool(os.getenv('SCREENING_ENABLED'), default=False),
         )
     

@@ -20,6 +20,7 @@ from api.v1.endpoints import (
     backtest,
     data,
     decision_signals,
+    execution,
     health,
     history,
     intelligence,
@@ -97,6 +98,12 @@ router.include_router(
     decision_signals.router,
     prefix="/decision-signals",
     tags=["DecisionSignals"]
+)
+
+router.include_router(
+    execution.router,
+    prefix="/execution/intents",
+    tags=["Execution"]
 )
 
 router.include_router(

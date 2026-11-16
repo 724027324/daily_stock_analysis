@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [新功能] 新增独立 A 股执行层：DecisionSignal 落库后可生成订单意图，支持 `manual`/`auto` 确认模式、纸面提交与通达信本机客户端实盘适配（默认关闭实盘），并提供执行队列 Web/API。
 - [修复] Tushare 日线接口权限拒绝不再累计整源故障，避免 ETF 与 A 股接口互相误伤；保留网络故障计数和半开探测恢复行为。
 
 - [修复] Tushare 权限熔断仅规范化网关 URL 的协议和主机名，保留路径与查询参数大小写，避免不同路由共享拒绝缓存；切换地址后恢复 Fetcher、选股快照及日线优先源尝试，格式错误的地址仍按原有链路回退备用源。

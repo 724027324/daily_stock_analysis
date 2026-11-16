@@ -5,6 +5,7 @@
 ## 能力边界
 
 - `DecisionSignal` 只记录建议、证据摘要、风险、观察条件、生命周期和来源，不执行下单或调仓。
+- 实盘/纸面下单属于独立 `execution` 域（见 [通达信实盘执行](live-execution-tdx.md)）；信号落库成功后仅 best-effort 触发订单意图，失败不回滚报告或信号。
 - 写入失败、提取失败、告警信号关联失败和通知发送失败都不阻断主分析、告警触发或报告保存。
 - #1756 已将 `decision_profile` 字段化并修正 server-side filter、去重、续期和 active 失效语义；#1757 在该正式字段契约上增加用户确认后的 reassess persist。两者都不新增环境变量、config registry 项或 `.env.example` 内容。
 - 当前没有 `DECISION_SIGNAL_*` 开关；信号功能的关闭或回滚通过 revert 对应代码完成。
